@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->string('password', 100);
             $table->string('phone', 10)->nullable();
             $table->boolean('accept_terms')->nullable();
+            $table->string('verification_code', 10)->nullable();
             $table->timestamps();
         });
     }

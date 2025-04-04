@@ -20,3 +20,4 @@ Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/googleLogin', [AuthController::class, 'googleLogin']);
 Route::get('/business-types', [BusinessTypeController::class, 'getBusinessTypes']);
+Route::post('/verify-code', [AuthController::class, 'verifyCode']);

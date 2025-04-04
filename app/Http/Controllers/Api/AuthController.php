@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\SignupRequest;
+use App\Mail\SignupConfirmation;
 use App\Models\Business;
 use App\Models\BusinessType;
 use App\Models\User;
-use Hash;
 use http\Env\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -106,8 +108,11 @@ class AuthController extends Controller
         ], 422);
     }
 
-     // Check if acceptTerms is provided and valid, set default to false
-     $acceptTerms = $request->has('acceptTerms') && $request->acceptTerms === true ? 1 : 0;
+    // Check if acceptTerms is provided and valid, set default to false
+    $acceptTerms = $request->has('acceptTerms') && $request->acceptTerms === true ? 1 : 0;
+
+    // Generate a 6-digit verification code
+    $verificationCode = random_int(100000, 999999);
 
     // Create a new user
     $user = User::create([
@@ -116,6 +121,7 @@ class AuthController extends Controller
         'username' => $validatedData['username'],
         'phone' => $validatedData['phone'], // Assuming phone is provided in the request
         'accept_terms' => $acceptTerms,
+        'verification_code' => $verificationCode,
     ]);
 
     // Create a new business
@@ -125,18 +131,15 @@ class AuthController extends Controller
         'user_id' => $user->id, // Link to the created user
     ]);
 
-    // Generate token for the new user
-    $token = $user->createToken('main')->plainTextToken;
+    // Send confirmation email with the verification code
+    Mail::to($user->email)->send(new SignupConfirmation($user, $verificationCode));
 
     return response()->json([
         'status' => 'success',
-        'message' => 'Signup successful!',
-        'user' => $user,
-        'token' => $token
+        'message' => 'Signup successful! A verification email has been sent. Please verify your email to complete the process.'
     ], 200);
 }
 
-    
 
     public function logout(Request $request)
 {
@@ -148,5 +151,46 @@ class AuthController extends Controller
         'message' => 'Logged out successfully'
     ], 200);
 }
+
+    public function verifyCode(Request $request)
+    {
+        // Validate the request
+        $request->validate([
+            'email' => 'required|email',
+            'verification_code' => 'required|digits:6',
+        ]);
+
+        // Find the user by email
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not found.'
+            ], 404);
+        }
+
+        // Check if the verification code matches
+        if ($user->verification_code != $request->verification_code) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid verification code.'
+            ], 422);
+        }
+
+        // Clear the verification code and mark the user as verified
+        $user->verification_code = null;
+        $user->save();
+
+        // Generate token for the user
+        $token = $user->createToken('main')->plainTextToken;
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Email verified successfully!',
+            'user' => $user,
+            'token' => $token
+        ], 200);
+    }
 
 }

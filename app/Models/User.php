@@ -23,6 +23,7 @@ class User extends Authenticatable
         'password',
         'phone',
         'accept_terms',
+        'verification_code',
     ];
 
     /**
